@@ -115,18 +115,13 @@
           <label>Source
             <select name="provider">
               <option value="adsblol">adsb.lol (free, open)</option>
-              <option value="airplaneslive">airplanes.live</option>
               <option value="adsbfi">adsb.fi</option>
-              <option value="opensky">OpenSky Network</option>
+              <option value="opensky">OpenSky (anonymous limit ≈ 400 requests/day)</option>
               <option value="demo">Demo — simulated traffic</option>
             </select>
           </label>
-          <label>Route
-            <select name="route">
-              <option value="auto">Auto (proxy, then direct)</option>
-              <option value="proxy">Via local server proxy</option>
-              <option value="direct">Direct from browser</option>
-            </select>
+          <label>Proxy URL <span class="hint">(blank = this server)</span>
+            <input name="proxyUrl" type="url" inputmode="url" placeholder="https://quiet-on-set.you.workers.dev" autocomplete="off" />
           </label>
         </div>
         <div class="row">

@@ -16,11 +16,6 @@ export const PROVIDERS = {
     url: (lat, lon, r) => `https://api.adsb.lol/v2/point/${lat.toFixed(4)}/${lon.toFixed(4)}/${clampRadius(r, 250)}`,
     parse: parseReadsb,
   },
-  airplaneslive: {
-    label: 'airplanes.live',
-    url: (lat, lon, r) => `https://api.airplanes.live/v2/point/${lat.toFixed(4)}/${lon.toFixed(4)}/${clampRadius(r, 250)}`,
-    parse: parseReadsb,
-  },
   adsbfi: {
     label: 'adsb.fi',
     url: (lat, lon, r) =>
@@ -38,7 +33,7 @@ export const PROVIDERS = {
   },
 };
 
-/** readsb / tar1090 "v2" JSON, used by adsb.lol, airplanes.live and adsb.fi. */
+/** readsb / tar1090 "v2" JSON, used by adsb.lol and adsb.fi. */
 export function parseReadsb(json) {
   const list = json?.ac ?? json?.aircraft ?? [];
   const out = [];

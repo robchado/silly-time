@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { parseReadsb, parseOpenSky, buildUrl } from '../public/js/providers.js';
 import { handleFlights } from '../server.js';
 
-test('parses readsb v2 JSON (adsb.lol / airplanes.live)', () => {
+test('parses readsb v2 JSON (adsb.lol / adsb.fi)', () => {
   const json = {
     ac: [
       { hex: 'A1B2C3', flight: 'UAL123  ', r: 'N12345', t: 'B738', category: 'A3', lat: 34.1, lon: -118.3, alt_baro: 4500, alt_geom: 4625, gs: 250.4, track: 92.1, baro_rate: -640, seen_pos: 1.2 },
@@ -48,10 +48,10 @@ test('server proxy validates input and relays upstream', async () => {
     called = url;
     return { ok: true, status: 200, text: async () => '{"ac":[]}' };
   };
-  const ok = await handleFlights(new URLSearchParams({ provider: 'airplaneslive', lat: 51.5, lon: -0.12, radius: 10 }), fake);
+  const ok = await handleFlights(new URLSearchParams({ provider: 'adsbfi', lat: 51.5, lon: -0.12, radius: 10 }), fake);
   assert.equal(ok.status, 200);
   assert.equal(ok.body, '{"ac":[]}');
-  assert.match(called, /airplanes\.live\/v2\/point\/51\.5000\/-0\.1200\/10/);
+  assert.match(called, /adsb\.fi\/api\/v2\/lat\/51\.5000\/lon\/-0\.1200\/dist\/10/);
   const down = await handleFlights(new URLSearchParams({ provider: 'adsbfi', lat: 1, lon: 2 }), async () => { throw new Error('ECONNRESET'); });
   assert.equal(down.status, 502);
 });

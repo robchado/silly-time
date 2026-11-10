@@ -1,0 +1,7 @@
+name = "quiet-on-set"
+main = "worker.js"
+compatibility_date = "2025-06-01"
+
+# Optional: only let your own site use the proxy.
+# [vars]
+# ALLOWED_ORIGINS = "https://robchado.github.io"

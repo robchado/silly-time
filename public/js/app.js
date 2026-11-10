@@ -12,7 +12,7 @@ const DEFAULTS = {
   lon: -118.2437,
   elevFt: 300,
   provider: 'adsblol',
-  route: 'auto',
+  proxyUrl: '', // blank = same-origin server (npm start); set to a Cloudflare Worker URL for static hosting
   radiusNm: 15,
   pollSec: 10,
   includeGround: false,
@@ -45,7 +45,21 @@ function saveSettings() {
 
 const params = new URLSearchParams(location.search);
 const S = loadSettings();
+if (!PROVIDERS[S.provider] && S.provider !== 'demo') S.provider = DEFAULTS.provider; // e.g. retired airplanes.live
 if (params.has('demo')) S.provider = 'demo';
+// Shareable setup link: ?proxy=https://your-worker.workers.dev saves the proxy on this device.
+if (params.has('proxy')) {
+  S.proxyUrl = normaliseProxy(params.get('proxy'));
+  saveSettings();
+  params.delete('proxy');
+  history.replaceState(null, '', `${location.pathname}${params.size ? '?' + params : ''}${location.hash}`);
+}
+
+function normaliseProxy(u) {
+  u = (u || '').trim().replace(/\/+$/, '');
+  if (u && !/^https?:\/\//i.test(u)) u = `https://${u}`;
+  return u;
+}
 
 // ------------------------------------------------------------------ state
 
@@ -59,7 +73,8 @@ const state = {
   overall: null,
   sim: null,
   simLastT: 0,
-  proxyWorks: null, // null = unknown
+  proxyWorks: null, // same-origin server proxy: null = unknown
+  route: null,
   selectedId: null,
   log: [],
   sound: { status: null, overSince: null },
@@ -83,25 +98,53 @@ async function fetchFlights() {
     return state.sim.snapshot();
   }
 
-  const tryProxy = S.route === 'proxy' || (S.route === 'auto' && state.proxyWorks !== false);
-  if (tryProxy) {
+  const q = new URLSearchParams({ provider: S.provider, lat: S.lat, lon: S.lon, radius: S.radiusNm });
+  if (S.proxyUrl) {
+    state.route = 'proxy';
+    let res;
     try {
-      const q = new URLSearchParams({ provider: S.provider, lat: S.lat, lon: S.lon, radius: S.radiusNm });
+      res = await fetch(`${S.proxyUrl}/api/flights?${q}`, { cache: 'no-store' });
+    } catch {
+      throw new Error(`can't reach proxy ${new URL(S.proxyUrl).host}`);
+    }
+    if (!res.ok) throw new Error(`proxy: ${await errorText(res)}`);
+    return parse(S.provider, await res.json());
+  }
+
+  // No proxy configured: try the server this page came from (npm start)...
+  if (state.proxyWorks !== false) {
+    try {
       const res = await fetch(`api/flights?${q}`, { cache: 'no-store' });
-      if (!res.ok) throw new Error(`proxy ${res.status}: ${(await res.text()).slice(0, 120)}`);
+      if (res.status === 404) throw Object.assign(new Error('no local proxy'), { noProxy: true });
+      if (!res.ok) throw new Error(`server proxy: ${await errorText(res)}`);
       const json = await res.json();
       state.proxyWorks = true;
+      state.route = 'server';
       return parse(S.provider, json);
     } catch (e) {
-      if (S.route === 'proxy') throw e;
-      // In auto mode, only fall back to direct when there is no proxy at all.
-      if (state.proxyWorks === true) throw e;
+      if (!e.noProxy && state.proxyWorks === true) throw e;
       state.proxyWorks = false;
     }
   }
-  const res = await fetch(buildUrl(S.provider, S.lat, S.lon, S.radiusNm), { cache: 'no-store' });
-  if (!res.ok) throw new Error(`${PROVIDERS[S.provider].label} returned HTTP ${res.status}`);
+  // ...then the provider directly. Most providers block this from other websites (CORS).
+  state.route = 'direct';
+  let res;
+  try {
+    res = await fetch(buildUrl(S.provider, S.lat, S.lon, S.radiusNm), { cache: 'no-store' });
+  } catch {
+    throw new Error('the browser blocked the request (CORS). Add a proxy URL in Settings → Flight data — see README');
+  }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return parse(S.provider, await res.json());
+}
+
+async function errorText(res) {
+  const t = await res.text().catch(() => '');
+  try {
+    return JSON.parse(t).error || `HTTP ${res.status}`;
+  } catch {
+    return `HTTP ${res.status}`;
+  }
 }
 
 let pollTimer = null;
@@ -132,7 +175,7 @@ function updateFeed() {
     $('feedText').textContent = `${PROVIDERS[S.provider].label}: ${state.lastError}${age}`;
   } else if (state.fetchedAt) {
     el.classList.add('ok');
-    const via = state.proxyWorks ? 'via proxy' : 'direct';
+    const via = { proxy: 'via proxy', server: 'via server', direct: 'direct' }[state.route] ?? '';
     $('feedText').textContent = `${PROVIDERS[S.provider].label} ${via} · updated ${fmtAgo(Date.now() - state.fetchedAt)}`;
   }
 }
@@ -454,10 +497,11 @@ function applySettings() {
   audio.calOffset = S.calOffset;
   audio.setWeighting(S.weighting);
   setMeterLabels();
-  if (prev.route !== S.route) state.proxyWorks = null;
+  S.proxyUrl = normaliseProxy(S.proxyUrl);
+  if (prev.proxyUrl !== S.proxyUrl) state.proxyWorks = null;
   if (audio.running && prev.deviceId !== S.deviceId) toggleMic().then(toggleMic);
   addLog('INFO', 'Settings updated');
-  const refetch = ['lat', 'lon', 'provider', 'route', 'radiusNm', 'pollSec'].some((k) => prev[k] !== S[k]);
+  const refetch = ['lat', 'lon', 'provider', 'proxyUrl', 'radiusNm', 'pollSec'].some((k) => prev[k] !== S[k]);
   if (refetch) {
     state.aircraft = [];
     state.fetchedAt = 0;
