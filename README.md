@@ -19,6 +19,12 @@ npm start            # http://localhost:8080  (Node 18+, no dependencies)
 - On first launch, open **Settings → 📍 Use my location**, or enter the set's coordinates and ground elevation.
 - Press **🎙 Start mic**. Browsers only allow the microphone on `https://` or `localhost`. To use phones on set, put the server behind HTTPS (for example a reverse proxy, a tunnel, or any static host).
 
+### Hosted on GitHub Pages
+
+Each push to the default branch runs the tests and publishes `public/` to GitHub Pages (`.github/workflows/pages.yml`). Pages serves over HTTPS, so the microphone works on phones; open the link and use **Add to Home Screen**. Without the server, the app fetches flight data directly from the browser. If a provider rejects those requests, pick a different one in Settings.
+
+One-time setup: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+
 `npm test` runs the unit tests (noise model, roll logic, data parsing, DSP and calibration math, and the proxy).
 
 ## Flight data sources
