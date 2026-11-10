@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0d1016" />
+  <title>Quiet on Set</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M3 7h13l5-3v16l-5-3H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Zm3 3v4h2v-4H6Zm4 0v4h2v-4h-2Z"/></svg>
+      <span>Quiet on Set</span>
+    </div>
+    <div class="feed" id="feed" title="Flight data status"><span class="dot"></span><span id="feedText">Starting…</span></div>
+    <div class="actions">
+      <button id="micBtn" class="btn">🎙 Start mic</button>
+      <button id="settingsBtn" class="btn ghost" aria-label="Settings">⚙ Settings</button>
+    </div>
+  </header>
+
+  <section id="banner" class="banner standby" aria-live="polite">
+    <div class="banner-main">
+      <div class="verdict" id="verdict">—</div>
+      <div class="detail">
+        <div class="headline" id="headline">Waiting for flight data…</div>
+        <div class="sub" id="subline"></div>
+      </div>
+    </div>
+    <div class="pills">
+      <div class="pill" id="skyPill"><span class="k">Sky</span><span class="v" id="skyVal">—</span></div>
+      <div class="pill" id="soundPill"><span class="k">Sound</span><span class="v" id="soundVal">mic off</span></div>
+      <div class="pill"><span class="k">Take</span><span class="v" id="takeVal">2:00</span></div>
+    </div>
+  </section>
+
+  <main class="grid">
+    <section class="card radar-card">
+      <div class="card-h">
+        <h2>Airspace</h2>
+        <span class="muted" id="radarMeta"></span>
+      </div>
+      <div class="radar-wrap"><canvas id="radar"></canvas></div>
+      <div class="card-h small">
+        <h3>Predicted aircraft noise at set</h3>
+        <span class="muted" id="tlMeta"></span>
+      </div>
+      <canvas id="timeline" class="timeline"></canvas>
+    </section>
+
+    <section class="card list-card">
+      <div class="card-h">
+        <h2>Aircraft</h2>
+        <span class="muted" id="acCount"></span>
+      </div>
+      <div class="table-wrap">
+        <table class="ac">
+          <thead>
+            <tr><th>Flight</th><th>Alt</th><th>Range</th><th>Now</th><th>Peak</th><th>CPA</th></tr>
+          </thead>
+          <tbody id="acBody"></tbody>
+        </table>
+        <p class="empty" id="acEmpty">No aircraft in range.</p>
+      </div>
+    </section>
+
+    <section class="card audio-card">
+      <div class="card-h">
+        <h2>Spectrum analyzer</h2>
+        <span class="muted" id="hoverFreq"></span>
+      </div>
+      <div class="meters">
+        <div class="meter big"><span class="k" id="lafLabel">LAF</span><span class="v" id="laf">--.-</span><span class="u">dB</span></div>
+        <div class="meter"><span class="k" id="lasLabel">LAS</span><span class="v" id="las">--.-</span></div>
+        <div class="meter"><span class="k" id="leqLabel">LAeq 10s</span><span class="v" id="leq">--.-</span></div>
+        <div class="meter"><span class="k" id="maxLabel">LAFmax</span><span class="v" id="lmax">--.-</span><button class="link" id="resetMax">reset</button></div>
+      </div>
+      <canvas id="spectrum" class="spectrum"></canvas>
+      <canvas id="spectrogram" class="spectrogram"></canvas>
+      <div class="bands" id="bands"></div>
+      <p class="muted note" id="micNote">Start the mic to analyse the set's soundscape. Levels are approximate until you calibrate against a sound level meter (Settings → Microphone).</p>
+    </section>
+
+    <section class="card log-card">
+      <div class="card-h">
+        <h2>Log</h2>
+        <button class="link" id="exportLog">export CSV</button>
+      </div>
+      <ol class="log" id="log"></ol>
+    </section>
+  </main>
+
+  <dialog id="settings">
+    <form method="dialog" id="settingsForm">
+      <h2>Settings</h2>
+
+      <fieldset>
+        <legend>Set location</legend>
+        <div class="row">
+          <label>Latitude <input name="lat" type="number" step="any" required /></label>
+          <label>Longitude <input name="lon" type="number" step="any" required /></label>
+        </div>
+        <div class="row">
+          <label>Ground elevation (ft MSL) <input name="elevFt" type="number" step="1" /></label>
+          <button type="button" class="btn" id="locateBtn">📍 Use my location</button>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Flight data</legend>
+        <div class="row">
+          <label>Source
+            <select name="provider">
+              <option value="adsblol">adsb.lol (free, open)</option>
+              <option value="airplaneslive">airplanes.live</option>
+              <option value="adsbfi">adsb.fi</option>
+              <option value="opensky">OpenSky Network</option>
+              <option value="demo">Demo — simulated traffic</option>
+            </select>
+          </label>
+          <label>Route
+            <select name="route">
+              <option value="auto">Auto (proxy, then direct)</option>
+              <option value="proxy">Via local server proxy</option>
+              <option value="direct">Direct from browser</option>
+            </select>
+          </label>
+        </div>
+        <div class="row">
+          <label>Search radius (nm) <input name="radiusNm" type="number" min="2" max="60" step="1" /></label>
+          <label>Refresh every (s) <input name="pollSec" type="number" min="3" max="120" step="1" /></label>
+        </div>
+        <label class="check"><input name="includeGround" type="checkbox" /> Include aircraft on the ground (taxiing near an airfield)</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Roll criteria</legend>
+        <div class="row">
+          <label>Aircraft noise limit at set (dBA) <input name="thresholdDbA" type="number" step="1" /></label>
+          <label>Safety margin (dB) <input name="marginDb" type="number" step="1" min="0" /></label>
+        </div>
+        <div class="row">
+          <label>Take length (s) <input name="takeSec" type="number" min="10" step="5" /></label>
+          <label>Look-ahead (min) <input name="horizonMin" type="number" min="2" max="30" step="1" /></label>
+        </div>
+        <label>Building attenuation (dB) — 0 for exterior, ~15–25 for interior stages
+          <input name="attenuationDb" type="number" min="0" max="50" step="1" />
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Microphone</legend>
+        <div class="row">
+          <label>Input device <select name="deviceId" id="deviceSelect"><option value="">Default</option></select></label>
+          <label>Weighting
+            <select name="weighting">
+              <option value="A">A (speech / hearing)</option>
+              <option value="C">C (keeps low rumble)</option>
+              <option value="Z">Z (flat)</option>
+            </select>
+          </label>
+        </div>
+        <div class="row">
+          <label>On-set sound limit (dB) <input name="micLimit" type="number" step="1" /></label>
+          <label>Calibration offset (dB) <input name="calOffset" type="number" step="0.1" /></label>
+        </div>
+        <div class="row">
+          <label>Calibrate: your meter reads (dB) <input id="calRef" type="number" step="0.1" placeholder="e.g. 52.0" /></label>
+          <button type="button" class="btn" id="calBtn">Match current reading</button>
+        </div>
+      </fieldset>
+
+      <div class="dialog-actions">
+        <button value="cancel" class="btn ghost" formnovalidate>Cancel</button>
+        <button value="save" class="btn primary" id="saveBtn">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

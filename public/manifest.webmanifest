@@ -1,0 +1,10 @@
+{
+  "name": "Quiet on Set",
+  "short_name": "QuietOnSet",
+  "description": "Flight-aware safe-to-roll monitor and spectrum analyzer for film sets",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0d1016",
+  "theme_color": "#0d1016",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
